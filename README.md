@@ -133,42 +133,6 @@ For deployment, just change this one line to your production URL!
    - Health tips
    - Hospital finder (if medium/high risk)
 
-## 🐛 Troubleshooting
-
-### Backend Issues
-
-**"ModuleNotFoundError: No module named 'flask'"**
-- Solution: Activate virtual environment first!
-- Windows: `venv\Scripts\activate`
-- Mac/Linux: `source venv/bin/activate`
-
-**"Port 5000 already in use"**
-- Solution: Change port in `app.py` (last line):
-  ```python
-  app.run(debug=True, host='0.0.0.0', port=5001)
-  ```
-  Also update frontend JavaScript files to use port 5001
-
-**Gemini API Errors**
-- Check if API key is correct in `.env`
-- Verify you have internet connection
-- Check API quota at: https://makersuite.google.com
-
-### Frontend Issues
-
-**"404 Not Found" on login page**
-- Make sure you're accessing: `http://localhost:8000`
-- Check terminal - frontend server should be running
-
-**"CORS Error" in browser console**
-- Backend is not running OR
-- API_BASE_URL is wrong in JavaScript files
-
-**Login not working**
-- Check backend terminal for errors
-- Verify backend is running on port 5000
-- Open http://localhost:5000/api/health - should show "healthy"
-
 ## 🎨 UI Preview
 
 The app features:
@@ -194,31 +158,9 @@ The app features:
 4. **AI Analysis** → Gemini generates explanations and tips
 5. **Display results** → Beautiful UI with all information
 
-## 🚀 Deployment Guide
 
-### Backend → Render
+## 🎉 Made by Vanshika Bhojani
 
-1. Push backend folder to GitHub
-2. Create web service on Render
-3. Set environment variables
-4. Deploy!
-
-### Frontend → Vercel
-
-1. Update `API_BASE_URL` in JS files to your Render URL
-2. Push frontend folder to GitHub
-3. Import to Vercel
-4. Deploy!
-
-Detailed guides in backend/README.md and frontend/README.md
-
-## 📞 Need Help?
-
-**Backend Terminal** - Shows all API requests and errors
-**Frontend Console** (F12) - Shows JavaScript errors
-**Network Tab** (F12) - Shows API calls and responses
-
-## 🎉 That's It!
 
 Your medical report analyzer is ready to use!
 
