@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Test</title>
+</head>
+<body>
+    <h1>Simple Upload Test</h1>
+    
+    <h2>Test 1: Manual Entry</h2>
+    <form id="manual-form">
+        <input type="number" id="hemoglobin" placeholder="Hemoglobin" value="10.5"><br>
+        <input type="number" id="blood_sugar" placeholder="Blood Sugar" value="165"><br>
+        <input type="number" id="cholesterol" placeholder="Cholesterol" value="260"><br>
+        <button type="submit">Analyze Manual</button>
+    </form>
+    
+    <h2>Test 2: File Upload</h2>
+    <form id="upload-form">
+        <input type="file" id="file-input" accept=".pdf,.txt"><br>
+        <button type="submit">Analyze File</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('manual-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Manual form submitted');
+            
+            const text = `Hemoglobin: ${document.getElementById('hemoglobin').value}\nBlood Sugar: ${document.getElementById('blood_sugar').value}\nCholesterol: ${document.getElementById('cholesterol').value}`;
+            
+            const formData = new FormData();
+            formData.append('text', text);
+            
+            console.log('Sending manual data...');
+            
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            });
+        });
+        
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Upload form submitted');
+            
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files || !fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            console.log('Sending file:', fileInput.files[0].name);
+            
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            });
+        });
+    </script>
+</body>
+</html>

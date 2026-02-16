@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Medical Report Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+                <span>Medical Report Analyzer</span>
+            </div>
+            <div class="nav-menu">
+                <span class="user-name">Welcome, {{ user_name }}</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="dashboard-header">
+            <h1>Medical Report Analysis</h1>
+            <p>Upload your medical report or enter values manually for AI-powered health risk assessment</p>
+        </div>
+        
+        <div class="upload-section">
+            <div class="upload-tabs">
+                <button class="tab-btn active" onclick="switchTab('upload')">Upload Report</button>
+                <button class="tab-btn" onclick="switchTab('manual')">Enter Manually</button>
+            </div>
+            
+            <div id="upload-tab" class="tab-content active">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="file-upload-area" id="file-drop-area">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <h3>Drop your medical report here</h3>
+                        <p>or click to browse</p>
+                        <p class="file-info">Supports PDF, PNG, JPG, TXT (Max 16MB)</p>
+                        <input type="file" id="file-input" name="file" accept=".pdf,.png,.jpg,.jpeg,.txt" style="display: none;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('file-input').click()">
+                            Browse Files
+                        </button>
+                    </div>
+                    <div id="file-name-display" class="file-name-display" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-block" id="upload-submit-btn">Analyze Report</button>
+                </form>
+            </div>
+            
+            <div id="manual-tab" class="tab-content">
+                <form id="manual-form">
+                    <div class="manual-input-grid">
+                        <div class="form-group">
+                            <label for="hemoglobin">Hemoglobin (g/dL)</label>
+                            <input type="number" id="hemoglobin" step="0.1" min="5" max="25" placeholder="e.g., 14.5">
+                            <small>Normal: 13.5-17.5 (men), 12-15.5 (women)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="blood_sugar">Blood Sugar (mg/dL)</label>
+                            <input type="number" id="blood_sugar" step="0.1" min="40" max="400" placeholder="e.g., 105">
+                            <small>Normal: 70-110 (fasting)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="cholesterol">Cholesterol (mg/dL)</label>
+                            <input type="number" id="cholesterol" step="0.1" min="100" max="400" placeholder="e.g., 180">
+                            <small>Normal: Less than 200</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">Analyze Values</button>
+                </form>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing your report...</p>
+        </div>
+        
+        <div id="results-section" class="results-section" style="display: none;">
+            <h2>Analysis Results</h2>
+            
+            <div class="risk-indicator">
+                <div id="risk-badge" class="risk-badge"></div>
+            </div>
+            
+            <div class="values-card">
+                <h3>Extracted Values</h3>
+                <div class="values-grid">
+                    <div class="value-item">
+                        <span class="value-label">Hemoglobin</span>
+                        <span class="value-number" id="result-hemoglobin"></span>
+                    </div>
+                    <div class="value-item">
+                        <span class="value-label">Blood Sugar</span>
+                        <span class="value-number" id="result-blood-sugar"></span>
+                    </div>
+                    <div class="value-item">
+                        <span class="value-label">Cholesterol</span>
+                        <span class="value-number" id="result-cholesterol"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="explanation-card">
+                <h3>AI Explanation</h3>
+                <div id="explanation-content" class="explanation-content"></div>
+            </div>
+            
+            <div class="tips-card">
+                <h3>💡 Personalized Health Tips</h3>
+                <ul id="health-tips-list" class="tips-list"></ul>
+            </div>
+            
+            <div id="hospital-section" class="hospital-section" style="display: none;">
+                <h3>Nearest Hospitals</h3>
+                <p class="hospital-info">Based on your risk level, here are nearby hospitals:</p>
+                <button class="btn btn-secondary" onclick="getLocation()">Find Hospitals Near Me</button>
+                <div id="hospitals-list" class="hospitals-list"></div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="speakResults()">🔊 Listen to Results</button>
+                <button class="btn btn-outline" onclick="resetForm()">Analyze Another Report</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

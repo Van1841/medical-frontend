@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Report Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .simple-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #6366f1;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .btn {
+            padding: 12px 24px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background: #4f46e5;
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            display: none;
+        }
+        .result-box.show {
+            display: block;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .loading.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="simple-container">
+        <h1 style="text-align: center; color: #6366f1;">Medical Report Analyzer</h1>
+        <p style="text-align: center; color: #64748b;">Welcome, {{ user_name }}! | <a href="/logout">Logout</a></p>
+        
+        <!-- MANUAL ENTRY TEST -->
+        <div class="test-section">
+            <h3>✍️ Manual Entry</h3>
+            <form id="manual-form">
+                <div class="form-group">
+                    <label>Hemoglobin (g/dL):</label>
+                    <input type="number" id="hemoglobin" step="0.1" value="10.5" required>
+                </div>
+                <div class="form-group">
+                    <label>Blood Sugar (mg/dL):</label>
+                    <input type="number" id="blood_sugar" step="0.1" value="165" required>
+                </div>
+                <div class="form-group">
+                    <label>Cholesterol (mg/dL):</label>
+                    <input type="number" id="cholesterol" step="0.1" value="260" required>
+                </div>
+                <button type="submit" class="btn">Analyze Values</button>
+            </form>
+        </div>
+        
+        <!-- FILE UPLOAD TEST -->
+        <div class="test-section">
+            <h3>📄 File Upload</h3>
+            <form id="upload-form">
+                <div class="form-group">
+                    <label>Select Medical Report (PDF/Image/Text):</label>
+                    <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.txt" required>
+                </div>
+                <button type="submit" class="btn">Analyze File</button>
+            </form>
+        </div>
+        
+        <!-- LOADING -->
+        <div id="loading" class="loading">
+            <p>⏳ Analyzing... Please wait...</p>
+        </div>
+        
+        <!-- RESULTS -->
+        <div id="result-box" class="result-box">
+            <h3>📊 Analysis Results:</h3>
+            <div id="result-content"></div>
+        </div>
+    </div>
+    
+    <script>
+        console.log('JavaScript loaded successfully!');
+        
+        // Manual Entry Form
+        document.getElementById('manual-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Manual form submitted');
+            
+            const hb = document.getElementById('hemoglobin').value;
+            const bs = document.getElementById('blood_sugar').value;
+            const chol = document.getElementById('cholesterol').value;
+            
+            const text = `Hemoglobin: ${hb}\nBlood Sugar: ${bs}\nCholesterol: ${chol}`;
+            
+            const formData = new FormData();
+            formData.append('text', text);
+            
+            sendAnalysis(formData);
+        });
+        
+        // File Upload Form
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Upload form submitted');
+            
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files || !fileInput.files[0]) {
+                alert('Please select a file!');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            console.log('File to upload:', fileInput.files[0].name);
+            
+            sendAnalysis(formData);
+        });
+        
+        // Send to backend
+        function sendAnalysis(formData) {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('result-box').classList.remove('show');
+            
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Success:', data);
+                document.getElementById('loading').classList.remove('show');
+                
+                if (data.error) {
+                    document.getElementById('result-content').innerHTML = `
+                        <p style="color: red;"><strong>Error:</strong> ${data.error}</p>
+                    `;
+                } else {
+                    document.getElementById('result-content').innerHTML = `
+                        <p><strong>Risk Level:</strong> ${data.risk_level}</p>
+                        <p><strong>Risk Score:</strong> ${data.risk_score}/100</p>
+                        <p><strong>Hemoglobin:</strong> ${data.values.hemoglobin || 'N/A'} g/dL</p>
+                        <p><strong>Blood Sugar:</strong> ${data.values.blood_sugar || 'N/A'} mg/dL</p>
+                        <p><strong>Cholesterol:</strong> ${data.values.cholesterol || 'N/A'} mg/dL</p>
+                        <p><strong>Explanation:</strong> ${data.explanation}</p>
+                    `;
+                }
+                
+                document.getElementById('result-box').classList.add('show');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('result-content').innerHTML = `
+                    <p style="color: red;"><strong>Error:</strong> ${error.message}</p>
+                    <p>Check browser console (F12) for details.</p>
+                `;
+                document.getElementById('result-box').classList.add('show');
+            });
+        }
+    </script>
+</body>
+</html>

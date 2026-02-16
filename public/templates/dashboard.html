@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Medical Report Analyzer</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+                <span>Medical Report Analyzer</span>
+            </div>
+            <div class="nav-menu">
+                <span class="user-name" id="user-name-display">Welcome</span>
+                <button onclick="logout()" class="btn btn-outline">Logout</button>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div id="message-container"></div>
+        
+        <div class="dashboard-header">
+            <h1>Medical Report Analysis</h1>
+            <p>Upload your medical report or enter values manually for AI-powered health risk assessment</p>
+        </div>
+        
+        <div class="upload-section">
+            <div class="upload-tabs">
+                <button class="tab-btn active" onclick="switchTab('upload')">Upload Report</button>
+                <button class="tab-btn" onclick="switchTab('manual')">Enter Manually</button>
+            </div>
+            
+            <div id="upload-tab" class="tab-content active">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="file-upload-area" id="file-drop-area">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <h3>Drop your medical report here</h3>
+                        <p>or click to browse</p>
+                        <p class="file-info">Supports PDF, PNG, JPG, TXT (Max 16MB)</p>
+                        <input type="file" id="file-input" name="file" accept=".pdf,.png,.jpg,.jpeg,.txt" style="display: none;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('file-input').click()">
+                            Browse Files
+                        </button>
+                    </div>
+                    <div id="file-name-display" class="file-name-display" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-block" id="upload-submit-btn">Analyze Report</button>
+                </form>
+            </div>
+            
+            <div id="manual-tab" class="tab-content">
+                <form id="manual-form">
+                    <div class="manual-input-grid">
+                        <div class="form-group">
+                            <label for="hemoglobin">Hemoglobin (g/dL)</label>
+                            <input type="number" id="hemoglobin" step="0.1" min="5" max="25" placeholder="e.g., 14.5">
+                            <small>Normal: 13.5-17.5 (men), 12-15.5 (women)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="blood_sugar">Blood Sugar (mg/dL)</label>
+                            <input type="number" id="blood_sugar" step="1" min="50" max="400" placeholder="e.g., 95">
+                            <small>Normal: 70-100 (fasting)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="cholesterol">Cholesterol (mg/dL)</label>
+                            <input type="number" id="cholesterol" step="1" min="100" max="400" placeholder="e.g., 180">
+                            <small>Normal: Below 200</small>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Analyze Values</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>Analyzing your report with AI...</p>
+        </div>
+
+        <div id="results-section" class="results-section" style="display: none;">
+            <div class="results-header">
+                <h2>📊 Analysis Results</h2>
+                <div class="results-actions">
+                    <button onclick="speakResults()" class="btn btn-secondary">
+                        🔊 Speak Results
+                    </button>
+                    <button onclick="resetForm()" class="btn btn-outline">
+                        🔄 Analyze Another
+                    </button>
+                </div>
+            </div>
+
+            <div class="values-grid">
+                <div class="value-card">
+                    <div class="value-icon">🩸</div>
+                    <div class="value-content">
+                        <span class="value-label">Hemoglobin</span>
+                        <span class="value-number" id="result-hemoglobin">--</span>
+                    </div>
+                </div>
+                
+                <div class="value-card">
+                    <div class="value-icon">🩺</div>
+                    <div class="value-content">
+                        <span class="value-label">Blood Sugar</span>
+                        <span class="value-number" id="result-blood-sugar">--</span>
+                    </div>
+                </div>
+                
+                <div class="value-card">
+                    <div class="value-icon">💊</div>
+                    <div class="value-content">
+                        <span class="value-label">Cholesterol</span>
+                        <span class="value-number" id="result-cholesterol">--</span>
+                    </div>
+                </div>
+                
+                <div class="value-card risk-card">
+                    <div class="value-icon">⚠️</div>
+                    <div class="value-content">
+                        <span class="value-label">Risk Level</span>
+                        <span class="risk-badge" id="risk-badge">Unknown</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>💡 AI Explanation</h3>
+                <div id="explanation-content" class="info-content"></div>
+            </div>
+
+            <div class="info-section">
+                <h3>🎯 Health Recommendations</h3>
+                <ul id="health-tips-list" class="tips-list"></ul>
+            </div>
+
+            <div id="hospital-section" class="info-section" style="display: none;">
+                <h3>🏥 Find Nearby Hospitals</h3>
+                <button onclick="getLocation()" class="btn btn-primary">
+                    📍 Get My Location & Find Hospitals
+                </button>
+                <div id="hospitals-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../static/js/dashboard.js"></script>
+    <script>
+        // Check authentication on page load
+        const API_BASE_URL = 'https://medical-backend-9fjs.onrender.com';
+        
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/user`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                
+                const data = await response.json();
+                document.getElementById('user-name-display').textContent = `Welcome, ${data.user.name}`;
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = 'login.html';
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch(`${API_BASE_URL}/api/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            window.location.href = 'login.html';
+        }
+        
+        // Check auth on load
+        checkAuth();
+    </script>
+</body>
+</html>

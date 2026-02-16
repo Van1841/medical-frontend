@@ -1,0 +1,435 @@
+function switchTab(tab) {
+    const uploadTab = document.getElementById('upload-tab');
+    const manualTab = document.getElementById('manual-tab');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    
+    tabBtns.forEach(btn => btn.classList.remove('active'));
+    
+    if (tab === 'upload') {
+        uploadTab.classList.add('active');
+        manualTab.classList.remove('active');
+        tabBtns[0].classList.add('active');
+    } else {
+        uploadTab.classList.remove('active');
+        manualTab.classList.add('active');
+        tabBtns[1].classList.add('active');
+    }
+}
+
+const fileInput = document.getElementById('file-input');
+const fileDropArea = document.getElementById('file-drop-area');
+const fileNameDisplay = document.getElementById('file-name-display');
+
+fileInput.addEventListener('change', function(e) {
+    if (this.files && this.files[0]) {
+        displayFileName(this.files[0].name);
+    }
+});
+
+fileDropArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#6366f1';
+    this.style.background = '#f8fafc';
+});
+
+fileDropArea.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#e2e8f0';
+    this.style.background = 'transparent';
+});
+
+fileDropArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#e2e8f0';
+    this.style.background = 'transparent';
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        fileInput.files = e.dataTransfer.files;
+        displayFileName(e.dataTransfer.files[0].name);
+    }
+});
+
+function displayFileName(filename) {
+    fileNameDisplay.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+            <polyline points="13 2 13 9 20 9"></polyline>
+        </svg>
+        <span>${filename}</span>
+    `;
+    fileNameDisplay.style.display = 'flex';
+}
+
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData();
+    const fileInput = document.getElementById('file-input');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Please select a file to upload');
+        return;
+    }
+    
+    formData.append('file', fileInput.files[0]);
+    analyzeReport(formData);
+});
+
+document.getElementById('manual-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const hemoglobin = document.getElementById('hemoglobin').value;
+    const bloodSugar = document.getElementById('blood_sugar').value;
+    const cholesterol = document.getElementById('cholesterol').value;
+    
+    if (!hemoglobin || !bloodSugar || !cholesterol) {
+        alert('Please enter all values');
+        return;
+    }
+    
+    const text = `Hemoglobin: ${hemoglobin}\nBlood Sugar: ${bloodSugar}\nCholesterol: ${cholesterol}`;
+    
+    const formData = new FormData();
+    formData.append('text', text);
+    
+    analyzeReport(formData);
+});
+
+function analyzeReport(formData) {
+    document.querySelector('.upload-section').style.display = 'none';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    
+    fetch('/analyze', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        
+        if (data.error) {
+            alert('Error: ' + data.error);
+            document.querySelector('.upload-section').style.display = 'block';
+            return;
+        }
+        
+        displayResults(data);
+    })
+    .catch(error => {
+        document.getElementById('loading').style.display = 'none';
+        alert('Error analyzing report: ' + error);
+        document.querySelector('.upload-section').style.display = 'block';
+    });
+}
+
+function displayResults(data) {
+    // Display values with dash if missing
+    document.getElementById('result-hemoglobin').textContent = 
+        data.values.hemoglobin !== null ? data.values.hemoglobin + ' g/dL' : '- -';
+    document.getElementById('result-blood-sugar').textContent = 
+        data.values.blood_sugar !== null ? data.values.blood_sugar + ' mg/dL' : '- -';
+    document.getElementById('result-cholesterol').textContent = 
+        data.values.cholesterol !== null ? data.values.cholesterol + ' mg/dL' : '- -';
+    
+    const riskBadge = document.getElementById('risk-badge');
+    riskBadge.textContent = data.risk_level + ' Risk';
+    riskBadge.className = 'risk-badge risk-' + data.risk_level.toLowerCase();
+    
+    // Display risk score gauge if available
+    if (data.risk_score !== undefined && typeof displayRiskGauge === 'function') {
+        displayRiskGauge(data.risk_score, data.risk_color || '#16a34a');
+        if (document.getElementById('risk-score-text')) {
+            document.getElementById('risk-score-text').textContent = data.risk_message || '';
+        }
+    }
+    
+    document.getElementById('explanation-content').innerHTML = data.explanation;
+    
+    // Display health tips
+    const tipsList = document.getElementById('health-tips-list');
+    tipsList.innerHTML = '';
+    if (data.tips && data.tips.length > 0) {
+        data.tips.forEach(tip => {
+            const li = document.createElement('li');
+            li.textContent = tip;
+            tipsList.appendChild(li);
+        });
+    }
+    
+    const hospitalSection = document.getElementById('hospital-section');
+    if (data.risk_level === 'Medium' || data.risk_level === 'High') {
+        hospitalSection.style.display = 'block';
+    } else {
+        hospitalSection.style.display = 'none';
+    }
+    
+    // Store result for voice feature
+    sessionStorage.setItem('lastResult', JSON.stringify(data));
+    
+    document.getElementById('results-section').style.display = 'block';
+    
+    // Check for emergency
+    if (typeof checkEmergency === 'function') {
+        checkEmergency(data);
+    }
+}
+
+function getLocation() {
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            findHospitals(position.coords.latitude, position.coords.longitude);
+        },
+        function(error) {
+            alert('Unable to get your location. Please enable location services.');
+        }
+    );
+}
+
+function findHospitals(lat, lon) {
+    fetch('/find-hospitals', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ lat: lat, lon: lon })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+        
+        displayHospitals(data.hospitals, data.maps_link);
+    })
+    .catch(error => {
+        alert('Error finding hospitals: ' + error);
+    });
+}
+
+function displayHospitals(hospitals, mapsLink) {
+    const hospitalsList = document.getElementById('hospitals-list');
+    
+    if (hospitals.length === 0) {
+        hospitalsList.innerHTML = '<p>No hospitals found nearby.</p>';
+        return;
+    }
+    
+    let html = '';
+    hospitals.forEach(hospital => {
+        html += `
+            <div class="hospital-item">
+                <div>
+                    <div class="hospital-name">${hospital.name}</div>
+                </div>
+                <div class="hospital-distance">${hospital.distance} km</div>
+            </div>
+        `;
+    });
+    
+    html += `<a href="${mapsLink}" target="_blank" class="btn btn-primary" style="margin-top: 16px; display: inline-block;">View on Google Maps</a>`;
+    
+    hospitalsList.innerHTML = html;
+}
+
+function resetForm() {
+    document.getElementById('upload-form').reset();
+    document.getElementById('manual-form').reset();
+    document.getElementById('file-name-display').style.display = 'none';
+    document.getElementById('results-section').style.display = 'none';
+    document.querySelector('.upload-section').style.display = 'block';
+    document.getElementById('hospitals-list').innerHTML = '';
+    document.getElementById('health-tips-list').innerHTML = '';
+}
+
+function speakResults() {
+    // Check if browser supports speech synthesis
+    if (!window.speechSynthesis) {
+        alert('Text-to-speech is not supported in your browser. Please try Chrome, Edge, or Safari.');
+        return;
+    }
+    
+    // Get stored result
+    const resultStr = sessionStorage.getItem('lastResult');
+    if (!resultStr) {
+        alert('No results available to read. Please analyze a report first.');
+        return;
+    }
+    
+    // Show language selection modal
+    showLanguageSelectionModal(JSON.parse(resultStr));
+}
+
+function showLanguageSelectionModal(data) {
+    // Create modal HTML
+    const modalHTML = `
+        <div id="language-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 40px; border-radius: 16px; max-width: 500px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <h2 style="margin: 0 0 24px 0; color: #1e293b;">🗣️ Choose Language / भाषा चुनें</h2>
+                <p style="color: #64748b; margin-bottom: 24px;">Select your preferred language for voice report</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <button onclick="speakInLanguage('en-US', 'English')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇬🇧 English
+                    </button>
+                    <button onclick="speakInLanguage('hi-IN', 'Hindi')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 हिंदी (Hindi)
+                    </button>
+                    <button onclick="speakInLanguage('mr-IN', 'Marathi')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 मराठी (Marathi)
+                    </button>
+                    <button onclick="speakInLanguage('ta-IN', 'Tamil')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 தமிழ் (Tamil)
+                    </button>
+                    <button onclick="speakInLanguage('te-IN', 'Telugu')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 తెలుగు (Telugu)
+                    </button>
+                    <button onclick="speakInLanguage('bn-IN', 'Bengali')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 বাংলা (Bengali)
+                    </button>
+                    <button onclick="speakInLanguage('gu-IN', 'Gujarati')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 ગુજરાતી (Gujarati)
+                    </button>
+                    <button onclick="speakInLanguage('kn-IN', 'Kannada')" class="lang-btn" style="padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; transition: all 0.3s;">
+                        🇮🇳 ಕನ್ನಡ (Kannada)
+                    </button>
+                </div>
+                <button onclick="closeLanguageModal()" style="margin-top: 24px; padding: 12px 24px; background: #e2e8f0; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add hover effect to language buttons
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('mouseenter', function() {
+            this.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            this.style.color = 'white';
+            this.style.borderColor = '#667eea';
+            this.style.transform = 'scale(1.05)';
+        });
+        btn.addEventListener('mouseleave', function() {
+            this.style.background = 'white';
+            this.style.color = '#1e293b';
+            this.style.borderColor = '#e2e8f0';
+            this.style.transform = 'scale(1)';
+        });
+    });
+}
+
+function closeLanguageModal() {
+    const modal = document.getElementById('language-modal');
+    if (modal) modal.remove();
+}
+
+function speakInLanguage(langCode, langName) {
+    closeLanguageModal();
+    
+    const resultStr = sessionStorage.getItem('lastResult');
+    const data = JSON.parse(resultStr);
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    // Get speech text in selected language
+    let speechText = getTranslatedSpeechText(data, langCode);
+    
+    // Create speech utterance
+    const utterance = new SpeechSynthesisUtterance(speechText);
+    utterance.lang = langCode;
+    utterance.rate = 0.85; // Slightly slower for clarity in all languages
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to find voice for selected language
+    const voices = window.speechSynthesis.getVoices();
+    const langVoice = voices.find(voice => voice.lang === langCode || voice.lang.startsWith(langCode.split('-')[0]));
+    if (langVoice) {
+        utterance.voice = langVoice;
+    }
+    
+    // Show speaking indicator
+    const speakBtn = document.querySelector('button[onclick="speakResults()"]');
+    if (speakBtn) {
+        const originalText = speakBtn.innerHTML;
+        speakBtn.innerHTML = `🔊 Speaking in ${langName}...`;
+        speakBtn.disabled = true;
+        
+        utterance.onend = function() {
+            speakBtn.innerHTML = originalText;
+            speakBtn.disabled = false;
+        };
+    }
+    
+    // Speak
+    window.speechSynthesis.speak(utterance);
+}
+
+function getTranslatedSpeechText(data, langCode) {
+    const hb = data.values.hemoglobin;
+    const bs = data.values.blood_sugar;
+    const chol = data.values.cholesterol;
+    const risk = data.risk_level;
+    
+    // Language-specific templates
+    const templates = {
+        'en-US': `Your health analysis is complete. Your risk level is ${risk}. ${hb !== null ? `Hemoglobin is ${hb} grams per deciliter. ` : ''}${bs !== null ? `Blood sugar is ${bs} milligrams per deciliter. ` : ''}${chol !== null ? `Cholesterol is ${chol} milligrams per deciliter. ` : ''}${risk === 'High' ? 'Important: Please consult a healthcare professional immediately.' : risk === 'Medium' ? 'We recommend scheduling a checkup with your doctor.' : 'Continue maintaining a healthy lifestyle.'}`,
+        
+        'hi-IN': `आपका स्वास्थ्य विश्लेषण पूर्ण हो गया है। आपका जोखिम स्तर ${risk} है। ${hb !== null ? `हीमोग्लोबिन ${hb} ग्राम प्रति डेसीलीटर है। ` : ''}${bs !== null ? `रक्त शर्करा ${bs} मिलीग्राम प्रति डेसीलीटर है। ` : ''}${chol !== null ? `कोलेस्ट्रॉल ${chol} मिलीग्राम प्रति डेसीलीटर है। ` : ''}${risk === 'High' ? 'महत्वपूर्ण: कृपया तुरंत डॉक्टर से परामर्श लें।' : risk === 'Medium' ? 'हम अनुशंसा करते हैं कि आप डॉक्टर से जांच कराएं।' : 'स्वस्थ जीवनशैली बनाए रखें।'}`,
+        
+        'mr-IN': `तुमचे आरोग्य विश्लेषण पूर्ण झाले आहे। तुमचा जोखीम पातळी ${risk} आहे। ${hb !== null ? `हिमोग्लोबिन ${hb} ग्रॅम प्रति डेसीलीटर आहे। ` : ''}${bs !== null ? `रक्त साखर ${bs} मिलिग्रॅम प्रति डेसीलीटर आहे। ` : ''}${chol !== null ? `कोलेस्टेरॉल ${chol} मिलिग्रॅम प्रति डेसीलीटर आहे। ` : ''}${risk === 'High' ? 'महत्त्वाचे: कृपया लगेच डॉक्टरांचा सल्ला घ्या।' : risk === 'Medium' ? 'आम्ही शिफारस करतो की तुम्ही डॉक्टरांकडून तपासणी करा।' : 'निरोगी जीवनशैली चालू ठेवा।'}`,
+        
+        'ta-IN': `உங்கள் சுகாதார பகுப்பாய்வு முடிந்தது. உங்கள் ஆபத்து நிலை ${risk} ஆகும். ${hb !== null ? `ஹீமோகுளோபின் ${hb} கிராம் பெர் டெசிலிட்டர். ` : ''}${bs !== null ? `இரத்த சர்க்கரை ${bs} மில்லிகிராம் பெர் டெசிலிட்டர். ` : ''}${chol !== null ? `கொலஸ்டிரால் ${chol} மில்லிகிராம் பெர் டெசிலிட்டர். ` : ''}${risk === 'High' ? 'முக்கியமானது: உடனடியாக மருத்துவரை அணுகவும்।' : risk === 'Medium' ? 'மருத்துவரிடம் பரிசோதனை செய்யுமாறு பரிந்துரைக்கிறோம்।' : 'ஆரோக்கியமான வாழ்க்கை முறையை தொடரவும்।'}`,
+        
+        'te-IN': `మీ ఆరోగ్య విశ్లేషణ పూర్తయింది. మీ రిస్క్ స్థాయి ${risk}. ${hb !== null ? `హిమోగ్లోబిన్ ${hb} గ్రాములు పర్ డెసిలిటర్. ` : ''}${bs !== null ? `బ్లడ్ షుగర్ ${bs} మిల్లీగ్రాములు పర్ డెసిలిటర్. ` : ''}${chol !== null ? `కొలెస్ట్రాల్ ${chol} మిల్లీగ్రాములు పర్ డెసిలిటర్. ` : ''}${risk === 'High' ? 'ముఖ్యమైనది: దయచేసి వెంటనే వైద్యుడిని సంప్రదించండి।' : risk === 'Medium' ? 'వైద్యుడితో చెకప్ చేయించుకోవాలని సిఫారసు చేస్తున్నాము।' : 'ఆరోగ్యకరమైన జీవనశైలిని కొనసాగించండి।'}`,
+        
+        'bn-IN': `আপনার স্বাস্থ্য বিশ্লেষণ সম্পূর্ণ হয়েছে। আপনার ঝুঁকির মাত্রা ${risk}। ${hb !== null ? `হিমোগ্লোবিন ${hb} গ্রাম প্রতি ডেসিলিটার। ` : ''}${bs !== null ? `রক্তের শর্করা ${bs} মিলিগ্রাম প্রতি ডেসিলিটার। ` : ''}${chol !== null ? `কোলেস্টেরল ${chol} মিলিগ্রাম প্রতি ডেসিলিটার। ` : ''}${risk === 'High' ? 'গুরুত্বপূর্ণ: অনুগ্রহ করে অবিলম্বে ডাক্তারের পরামর্শ নিন।' : risk === 'Medium' ? 'আমরা সুপারিশ করি যে আপনি ডাক্তারের কাছে চেকআপ করান।' : 'স্বাস্থ্যকর জীবনযাত্রা বজায় রাখুন।'}`,
+        
+        'gu-IN': `તમારું આરોગ્ય વિશ્લેષણ પૂર્ણ થયું છે। તમારું જોખમ સ્તર ${risk} છે। ${hb !== null ? `હિમોગ્લોબિન ${hb} ગ્રામ પ્રતિ ડેસિલિટર છે। ` : ''}${bs !== null ? `બ્લડ સુગર ${bs} મિલિગ્રામ પ્રતિ ડેસિલિટર છે। ` : ''}${chol !== null ? `કોલેસ્ટ્રોલ ${chol} મિલિગ્રામ પ્રતિ ડેસિલિટર છે। ` : ''}${risk === 'High' ? 'મહત્વપૂર્ણ: કૃપા કરીને તાત્કાલિક ડૉક્ટરની સલાહ લો।' : risk === 'Medium' ? 'અમે ભલામણ કરીએ છીએ કે તમે ડૉક્ટર પાસે તપાસ કરાવો।' : 'સ્વસ્થ જીવનશૈલી જાળવી રાખો।'}`,
+        
+        'kn-IN': `ನಿಮ್ಮ ಆರೋಗ್ಯ ವಿಶ್ಲೇಷಣೆ ಪೂರ್ಣಗೊಂಡಿದೆ। ನಿಮ್ಮ ಅಪಾಯದ ಮಟ್ಟ ${risk} ಆಗಿದೆ। ${hb !== null ? `ಹಿಮೋಗ್ಲೋಬಿನ್ ${hb} ಗ್ರಾಂ ಪ್ರತಿ ಡೆಸಿಲಿಟರ್। ` : ''}${bs !== null ? `ರಕ್ತದ ಸಕ್ಕರೆ ${bs} ಮಿಲಿಗ್ರಾಂ ಪ್ರತಿ ಡೆಸಿಲಿಟರ್। ` : ''}${chol !== null ? `ಕೊಲೆಸ್ಟರಾಲ್ ${chol} ಮಿಲಿಗ್ರಾಂ ಪ್ರತಿ ಡೆಸಿಲಿಟರ್। ` : ''}${risk === 'High' ? 'ಮುಖ್ಯವಾದುದು: ದಯವಿಟ್ಟು ತಕ್ಷಣ ವೈದ್ಯರನ್ನು ಸಂಪರ್ಕಿಸಿ।' : risk === 'Medium' ? 'ವೈದ್ಯರೊಂದಿಗೆ ತಪಾಸಣೆ ಮಾಡಿಸಿಕೊಳ್ಳುವಂತೆ ನಾವು ಶಿಫಾರಸು ಮಾಡುತ್ತೇವೆ।' : 'ಆರೋಗ್ಯಕರ ಜೀವನಶೈಲಿಯನ್ನು ಮುಂದುವರಿಸಿ।'}`
+    };
+    
+    return templates[langCode] || templates['en-US'];
+    }
+    
+    // Speak the text
+    window.speechSynthesis.speak(utterance);
+    
+    // Visual feedback
+    const speakButton = event.target;
+    const originalText = speakButton.innerHTML;
+    speakButton.innerHTML = '🔇 Stop Reading';
+    speakButton.classList.add('btn-danger');
+    
+    utterance.onend = function() {
+        speakButton.innerHTML = originalText;
+        speakButton.classList.remove('btn-danger');
+    };
+    
+    // Allow stopping the speech
+    speakButton.onclick = function() {
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            speakButton.innerHTML = originalText;
+            speakButton.classList.remove('btn-danger');
+            speakButton.onclick = function() { speakResults(); };
+        }
+    };
+}
+
+// Load voices when they become available
+if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = function() {
+        window.speechSynthesis.getVoices();
+    };
+}
