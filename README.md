@@ -160,8 +160,4 @@ The app features:
 
 
 ## 🎉 Made by Vanshika Bhojani
-
-
-Your medical report analyzer is ready to use!
-
 Happy analyzing! 🚀
